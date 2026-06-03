@@ -1,36 +1,31 @@
 workflows:
   ios-no-sign:
-    name: iOS IPA (no signing)
+    name: iOS IPA
     max_build_duration: 60
     instance_type: mac_mini_m2
-
     environment:
       flutter: 3.24.5
       xcode: latest
       cocoapods: default
-
     scripts:
       - name: Flutter pub get
         script: flutter pub get
-
       - name: Pod install
         script: cd ios && pod install --repo-update && cd ..
-
       - name: Build iOS
         script: flutter build ios --release --no-codesign
-
-      - name: Fix frameworks and create IPA
+      - name: Create IPA
         script: |
           APP="build/ios/iphoneos/Runner.app"
           for fw in "$APP/Frameworks"/*.framework; do
+            [ -d "$fw" ] || continue
             name=$(basename "$fw" .framework)
             plist="$fw/Info.plist"
-            if [ -f "$plist" ]; then
-              /usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$plist" 2>/dev/null || \
-                /usr/libexec/PlistBuddy -c "Add CFBundleExecutable string $name" "$plist"
-              /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$plist" 2>/dev/null || \
-                /usr/libexec/PlistBuddy -c "Add CFBundleIdentifier string dj.univ.testud.$name" "$plist"
-            fi
+            [ -f "$plist" ] || continue
+            /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add CFBundleIdentifier string dj.univ.testud.$name" "$plist"
+            /usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$plist" 2>/dev/null || \
+              /usr/libexec/PlistBuddy -c "Add CFBundleExecutable string $name" "$plist"
             codesign --force --sign - --timestamp=none "$fw" 2>/dev/null || true
           done
           codesign --force --sign - --timestamp=none "$APP" 2>/dev/null || true
@@ -38,7 +33,5 @@ workflows:
           rm -rf Payload && mkdir Payload
           cp -r Runner.app Payload/
           zip -qr TestUD.ipa Payload/
-
     artifacts:
       - build/ios/iphoneos/TestUD.ipa
-      - build/app/outputs/flutter-apk/app-release.apk
