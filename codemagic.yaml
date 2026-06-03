@@ -1,6 +1,6 @@
 workflows:
-  ios-no-sign:
-    name: iOS IPA
+  ios-simulator:
+    name: iOS Simulator Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -10,28 +10,19 @@ workflows:
     scripts:
       - name: Flutter pub get
         script: flutter pub get
+
       - name: Pod install
         script: cd ios && pod install --repo-update && cd ..
-      - name: Build iOS
-        script: flutter build ios --release --no-codesign
-      - name: Create IPA
+
+      - name: Build iOS Simulator
         script: |
-          APP="build/ios/iphoneos/Runner.app"
-          for fw in "$APP/Frameworks"/*.framework; do
-            [ -d "$fw" ] || continue
-            name=$(basename "$fw" .framework)
-            plist="$fw/Info.plist"
-            [ -f "$plist" ] || continue
-            /usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$plist" 2>/dev/null || \
-              /usr/libexec/PlistBuddy -c "Add CFBundleIdentifier string dj.univ.testud.$name" "$plist"
-            /usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$plist" 2>/dev/null || \
-              /usr/libexec/PlistBuddy -c "Add CFBundleExecutable string $name" "$plist"
-            codesign --force --sign - --timestamp=none "$fw" 2>/dev/null || true
-          done
-          codesign --force --sign - --timestamp=none "$APP" 2>/dev/null || true
-          cd build/ios/iphoneos
-          rm -rf Payload && mkdir Payload
-          cp -r Runner.app Payload/
-          zip -qr TestUD.ipa Payload/
+          flutter build ios --simulator --release
+
+      - name: Create ZIP for appetize
+        script: |
+          cd build/ios/iphonesimulator
+          zip -qr TestUD_simulator.zip Runner.app
+          echo "ZIP: $(du -sh TestUD_simulator.zip)"
+
     artifacts:
-      - build/ios/iphoneos/TestUD.ipa
+      - build/ios/iphonesimulator/TestUD_simulator.zip
